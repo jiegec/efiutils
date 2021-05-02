@@ -2,21 +2,9 @@
 #![no_main]
 #![feature(abi_efiapi, negative_impls)]
 
-use core::{borrow::Borrow, fmt::Write};
-
-use log::*;
-use uefi::{prelude::*, proto::media::file::RegularFile, Char16, Guid, Identify};
-use uefi::{
-    proto::media::{
-        file::{File, FileAttribute},
-        fs::SimpleFileSystem,
-    },
-    unsafe_guid,
-};
-use uefi::{
-    proto::{console::text::Input, Protocol},
-    CStr16,
-};
+use uefi::unsafe_guid;
+use uefi::{prelude::*, Char16, Guid, Identify};
+use uefi::{proto::Protocol, CStr16};
 
 pub use uefi::proto;
 
@@ -39,15 +27,15 @@ pub struct HiiConfigRouting {
 }
 
 #[entry]
-fn efi_main(image: uefi::Handle, st: SystemTable<Boot>) -> Status {
-    uefi_services::init(&st).expect_success("failed to initialize utilities");
+fn efi_main(_image: uefi::Handle, st: SystemTable<Boot>) -> Status {
+    uefi_services::init(&st).unwrap().unwrap();
     let bt = st.boot_services();
 
     let routing = bt.locate_protocol::<HiiConfigRouting>().unwrap().unwrap();
     let routing = unsafe { &mut *routing.get() };
 
     let mut results: *const Char16 = 0 as *const Char16;
-    let res = (routing.export_config)(&routing, &mut results);
+    let _res = (routing.export_config)(&routing, &mut results);
     let s = unsafe { CStr16::from_ptr(results) };
     st.stdout().output_string(s).unwrap().unwrap();
 

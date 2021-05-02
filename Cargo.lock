@@ -85,8 +85,6 @@ dependencies = [
 [[package]]
 name = "uefi"
 version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41f86f972322768901e872186fc8b7df009ca4ce3e945fc337614cdca0c526d4"
 dependencies = [
  "bitflags",
  "log",
@@ -97,8 +95,6 @@ dependencies = [
 [[package]]
 name = "uefi-macros"
 version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3dcca10ca861f34a320d178f3fdb29ffbf05087fc2c70d2a99860e3329bee1a8"
 dependencies = [
  "proc-macro2",
  "quote",
