@@ -2,8 +2,8 @@
 #![no_main]
 #![feature(abi_efiapi)]
 
-use uefi::prelude::*;
 use log::*;
+use uefi::prelude::*;
 
 #[entry]
 fn efi_main(image: uefi::Handle, st: SystemTable<Boot>) -> Status {
