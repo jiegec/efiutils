@@ -4,25 +4,11 @@
 
 extern crate alloc;
 
-use alloc::collections::BTreeSet;
-use alloc::vec;
+use log::*;
 use alloc::vec::Vec;
-use core::fmt::Write;
-use efiutils::HiiDatabase;
+use alloc::{collections::BTreeSet, vec};
+use efiutils::{FormBrowser2, HiiDatabase};
 use uefi::{prelude::*, Guid};
-
-fn dump(db: &mut HiiDatabase, handle: usize) -> Vec<u8> {
-    let mut buffer_size = 0;
-    // EFI_HII_PACKAGE_TYPE_ALL
-    let res = (db.export_package_lists)(&db, handle, &mut buffer_size, 0 as *mut u8);
-    assert!(res == Status::BUFFER_TOO_SMALL);
-
-    let mut buffer: Vec<u8> = vec![0u8; buffer_size];
-    let res = (db.export_package_lists)(&db, handle, &mut buffer_size, buffer.as_mut_ptr());
-    assert!(res == Status::SUCCESS);
-
-    buffer
-}
 
 #[entry]
 fn efi_main(_image: uefi::Handle, st: SystemTable<Boot>) -> Status {
@@ -52,16 +38,22 @@ fn efi_main(_image: uefi::Handle, st: SystemTable<Boot>) -> Status {
     // unique
     let mut buffer_set = BTreeSet::new();
     buffer_set.extend(buffer);
+    let buffer: Vec<usize> = buffer_set.into_iter().collect();
 
-    let stdout = st.stdout();
-    for handle in buffer_set {
-        let v = dump(db, handle);
-
-        for byte in v {
-            write!(stdout, "{:02X}", byte).unwrap();
-        }
-        writeln!(stdout).unwrap();
-    }
+    let browser = bt
+        .locate_protocol::<FormBrowser2>()
+        .expect_success("Locate form browser2 protocol failed");
+    let browser = unsafe { &mut *browser.get() };
+    let res = (browser.send_form)(
+        &browser,
+        buffer.as_ptr(),
+        buffer.len(),
+        0 as *const Guid,
+        0,
+        0 as *const u8,
+        0 as *mut u8,
+    );
+    info!("Res {:?}", res);
 
     Status::SUCCESS
 }
