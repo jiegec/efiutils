@@ -4,19 +4,11 @@
 
 extern crate alloc;
 
-use alloc::string::String;
-use alloc::{vec, vec::Vec};
+use alloc::vec;
 use bitflags::bitflags;
 use core::fmt::Write;
 use uefi::{data_types::chars::NUL_16, CStr16};
 use uefi::{prelude::*, Guid};
-
-fn ucs2_decode(s: &CStr16) -> String {
-    let mut buffer: Vec<u8> = vec![0; s.to_u16_slice().len() * 2];
-    let bytes = ucs2::decode(s.to_u16_slice(), &mut buffer).expect("UCS-2 decode failed");
-    buffer.resize(bytes, 0);
-    String::from_utf8(buffer).expect("UTF-8 decode failed")
-}
 
 #[entry]
 fn efi_main(_image: uefi::Handle, st: SystemTable<Boot>) -> Status {
@@ -42,7 +34,7 @@ fn efi_main(_image: uefi::Handle, st: SystemTable<Boot>) -> Status {
 
         writeln!(stdout, "GUID={}", guid).unwrap();
         let name_slice = unsafe { CStr16::from_ptr(name.as_ptr()) };
-        writeln!(stdout, "NAME={}", ucs2_decode(name_slice)).unwrap();
+        writeln!(stdout, "NAME={}", efiutils::ucs2_decode(name_slice)).unwrap();
 
         let mut data_size = data.len();
         let mut attributes = 0u32;
