@@ -10,6 +10,8 @@ edition = "2018"
 log = "0.4.14"
 uefi = "0.8.0"
 uefi-services = "0.5.0"
+ucs2 = "0.3.2"
+bitflags = "1.2.1"
 
 [patch.crates-io]
 uefi-macros = { path = "../uefi-rs/uefi-macros" }
