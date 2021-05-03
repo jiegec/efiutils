@@ -14,5 +14,6 @@ ucs2 = "0.3.2"
 bitflags = "1.2.1"
 
 [patch.crates-io]
+uefi-services = { path = "../uefi-rs/uefi-services" }
 uefi-macros = { path = "../uefi-rs/uefi-macros" }
 uefi = { path = "../uefi-rs" }
