@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+set -x
 cargo build
 mkdir -p esp/EFI/Boot
 cp target/x86_64-unknown-uefi/debug/*.efi esp/

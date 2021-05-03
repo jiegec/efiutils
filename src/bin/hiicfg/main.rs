@@ -28,10 +28,12 @@ pub struct HiiConfigRouting {
 
 #[entry]
 fn efi_main(_image: uefi::Handle, st: SystemTable<Boot>) -> Status {
-    uefi_services::init(&st).unwrap().unwrap();
+    uefi_services::init(&st).expect_success("UEFI services init failed");
     let bt = st.boot_services();
 
-    let routing = bt.locate_protocol::<HiiConfigRouting>().unwrap().unwrap();
+    let routing = bt
+        .locate_protocol::<HiiConfigRouting>()
+        .expect_success("Locate hii config routing protocol failed");
     let routing = unsafe { &mut *routing.get() };
 
     let mut results: *const Char16 = 0 as *const Char16;
