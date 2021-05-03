@@ -1,5 +1,5 @@
 [package]
-name = "efivars"
+name = "efiutils"
 version = "0.1.0"
 authors = ["Jiajie Chen <c@jia.je>"]
 edition = "2018"
