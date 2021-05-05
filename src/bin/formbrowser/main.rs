@@ -4,10 +4,10 @@
 
 extern crate alloc;
 
-use log::*;
 use alloc::vec::Vec;
 use alloc::{collections::BTreeSet, vec};
 use efiutils::{FormBrowser2, HiiDatabase};
+use log::*;
 use uefi::{prelude::*, Guid};
 
 #[entry]
@@ -44,16 +44,22 @@ fn efi_main(_image: uefi::Handle, st: SystemTable<Boot>) -> Status {
         .locate_protocol::<FormBrowser2>()
         .expect_success("Locate form browser2 protocol failed");
     let browser = unsafe { &mut *browser.get() };
-    let res = (browser.send_form)(
-        &browser,
-        buffer.as_ptr(),
-        buffer.len(),
-        0 as *const Guid,
-        0,
-        0 as *const u8,
-        0 as *mut u8,
-    );
-    info!("Res {:?}", res);
+
+    // try handles one by one
+    let mut v = vec![];
+    for i in 0..buffer.len() {
+        let res = (browser.send_form)(
+            &browser,
+            &buffer[i],
+            1,
+            0 as *const Guid,
+            0,
+            0 as *const u8,
+            0 as *mut u8,
+        );
+        v.push((i, res));
+    }
+    info!("Res {:?}", v);
 
     Status::SUCCESS
 }
