@@ -5,10 +5,10 @@ extern crate alloc;
 
 use alloc::string::String;
 use alloc::{vec, vec::Vec};
-use uefi::proto::Protocol;
 use uefi::unsafe_guid;
 use uefi::CStr16;
 use uefi::{prelude::*, Guid, Identify};
+use uefi::{proto::Protocol, Char16};
 
 pub use uefi::proto;
 
@@ -60,4 +60,12 @@ pub fn ucs2_decode(s: &CStr16) -> String {
     let bytes = ucs2::decode(s.to_u16_slice(), &mut buffer).expect("UCS-2 decode failed");
     buffer.resize(bytes, 0);
     String::from_utf8(buffer).expect("UTF-8 decode failed")
+}
+
+#[repr(C)]
+#[unsafe_guid("752f3136-4e16-4fdc-a22a-e5f46812f4ca")]
+#[derive(Protocol)]
+pub struct ShellParameters {
+    pub argv: *const *const Char16,
+    pub argc: usize,
 }

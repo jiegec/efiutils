@@ -6,12 +6,12 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 use alloc::{collections::BTreeSet, vec};
-use efiutils::{FormBrowser2, HiiDatabase};
+use efiutils::{ucs2_decode, FormBrowser2, HiiDatabase, ShellParameters};
 use log::*;
-use uefi::{prelude::*, Guid};
+use uefi::{prelude::*, CStr16, Char16, Guid};
 
 #[entry]
-fn efi_main(_image: uefi::Handle, st: SystemTable<Boot>) -> Status {
+fn efi_main(image: uefi::Handle, st: SystemTable<Boot>) -> Status {
     uefi_services::init(&st).expect_success("UEFI services init failed");
     let bt = st.boot_services();
 
@@ -45,20 +45,50 @@ fn efi_main(_image: uefi::Handle, st: SystemTable<Boot>) -> Status {
         .expect_success("Locate form browser2 protocol failed");
     let browser = unsafe { &mut *browser.get() };
 
-    // try handles one by one
+    let params = bt
+        .handle_protocol::<ShellParameters>(image)
+        .expect_success("Locate shell parameter protocol failed");
+    let params = unsafe { &mut *params.get() };
+
     let mut v = vec![];
-    for i in 0..buffer.len() {
-        let res = (browser.send_form)(
-            &browser,
-            &buffer[i],
-            1,
-            0 as *const Guid,
-            0,
-            0 as *const u8,
-            0 as *mut u8,
-        );
-        v.push((i, res));
+    let argv: &[*const Char16] = unsafe { core::slice::from_raw_parts(params.argv, params.argc) };
+    if params.argc > 1 {
+        info!("Handles: {}", buffer.len());
+        for s in &argv[1..] {
+            let arg = unsafe { CStr16::from_ptr(*s) };
+            let arg = ucs2_decode(arg);
+            info!("Arg: {}", arg);
+            if let Ok(i) = str::parse::<usize>(&arg) {
+                let res = (browser.send_form)(
+                    &browser,
+                    &buffer[i],
+                    1,
+                    0 as *const Guid,
+                    0,
+                    0 as *const u8,
+                    0 as *mut u8,
+                );
+                v.push((i, res));
+            }
+        }
+    } else {
+        // try handles one by one
+        for i in 0..buffer.len() {
+            let res = (browser.send_form)(
+                &browser,
+                &buffer[i],
+                1,
+                0 as *const Guid,
+                0,
+                0 as *const u8,
+                0 as *mut u8,
+            );
+            v.push((i, res));
+        }
     }
+
+    info!("Argc {:?}", params.argc);
+    info!("Argv {:?}", params.argv);
     info!("Res {:?}", v);
 
     Status::SUCCESS
