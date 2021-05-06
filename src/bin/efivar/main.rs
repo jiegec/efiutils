@@ -4,10 +4,12 @@
 
 extern crate alloc;
 
+use alloc::format;
 use alloc::vec;
+use anyhow::anyhow;
 use bitflags::bitflags;
 use core::fmt::Write;
-use efiutils::{parse_guid, ucs2_decode, ShellParameters};
+use efiutils::{err, parse_guid, ucs2_decode, ucs2_decode_ptr, ShellParameters};
 use log::*;
 use uefi::{data_types::chars::NUL_16, CStr16, Char16};
 use uefi::{prelude::*, Guid};
@@ -23,16 +25,61 @@ fn main(image: uefi::Handle, st: SystemTable<Boot>) -> anyhow::Result<()> {
     let params = unsafe { &mut *params.get() };
 
     let argv: &[*const Char16] = unsafe { core::slice::from_raw_parts(params.argv, params.argc) };
-    if params.argc == 5 {
+    if params.argc == 6 {
         // edit
-        // args: guid offset width value
-        let guid_str = ucs2_decode(unsafe { CStr16::from_ptr(argv[1]) })?;
-        let offset = ucs2_decode(unsafe { CStr16::from_ptr(argv[2]) })?;
-        let width = ucs2_decode(unsafe { CStr16::from_ptr(argv[3]) })?;
-        let value = ucs2_decode(unsafe { CStr16::from_ptr(argv[4]) })?;
+        // args: guid name offset width value
+        let guid_str = unsafe { ucs2_decode_ptr(argv[1]) }?;
+        let name_str = unsafe { ucs2_decode_ptr(argv[2]) }?;
+        let offset_str = unsafe { ucs2_decode_ptr(argv[3]) }?;
+        let width_str = unsafe { ucs2_decode_ptr(argv[4]) }?;
+        let value_str = unsafe { ucs2_decode_ptr(argv[5]) }?;
 
         let guid = parse_guid(&guid_str)?;
-        info!("GUID: {}", guid);
+        let offset = str::parse::<usize>(&offset_str).map_err(err)?;
+        let width = str::parse::<usize>(&width_str).map_err(err)?;
+        let value = str::parse::<u64>(&value_str).map_err(err)?;
+        writeln!(stdout, "GUID={}", guid).unwrap();
+
+        let mut data_size = 0;
+        let mut attributes = 0u32;
+        let res =
+            unsafe { rt.get_variable(argv[2], &guid, &mut attributes, &mut data_size, 0 as _) };
+        if let Err(error) = res {
+            if error.status() == Status::BUFFER_TOO_SMALL {
+                let mut data = vec![0u8; data_size];
+                let res = unsafe {
+                    rt.get_variable(
+                        argv[2],
+                        &guid,
+                        &mut attributes,
+                        &mut data_size,
+                        data.as_mut_ptr(),
+                    )
+                }
+                .map_err(err)?;
+
+                write!(stdout, "ORIG=").unwrap();
+                for byte in &data {
+                    write!(stdout, "{:02X}", byte).unwrap();
+                }
+                writeln!(stdout).unwrap();
+
+                let bytes = value.to_le_bytes();
+                for i in 0..width {
+                    data[offset + i] = bytes[width - i - 1];
+                }
+
+                write!(stdout, "NEW =").unwrap();
+                for byte in &data {
+                    write!(stdout, "{:02X}", byte).unwrap();
+                }
+                writeln!(stdout).unwrap();
+            } else {
+                return Err(anyhow!("GetVariable failed with {:?}", error));
+            }
+        } else {
+            return Err(anyhow!("Unexpected return value of GetVariable"));
+        }
     } else if params.argc == 1 {
         // list
         const NAME_SIZE: usize = 1024;
@@ -103,7 +150,7 @@ fn main(image: uefi::Handle, st: SystemTable<Boot>) -> anyhow::Result<()> {
     } else {
         info!("Usage:");
         info!("\tefivar.efi: List all variables");
-        info!("\tefivar.efi [guid] [offset] [width] [value]: Update value");
+        info!("\tefivar.efi [guid] [name] [offset] [width] [value]: Update value");
     }
 
     Ok(())

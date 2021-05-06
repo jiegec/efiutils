@@ -57,8 +57,12 @@ pub struct HiiDatabase {
     ) -> Status,
 }
 
-fn err<T: Debug>(e: T) -> anyhow::Error {
+pub fn err<T: Debug>(e: T) -> anyhow::Error {
     anyhow!("{:?}", e)
+}
+
+pub unsafe fn ucs2_decode_ptr(p: *const Char16) -> anyhow::Result<String> {
+    ucs2_decode(CStr16::from_ptr(p))
 }
 
 pub fn ucs2_decode(s: &CStr16) -> anyhow::Result<String> {
