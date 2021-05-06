@@ -3,8 +3,10 @@
 
 extern crate alloc;
 
+use alloc::fmt::Debug;
 use alloc::string::String;
-use alloc::{vec, vec::Vec};
+use alloc::{format, vec, vec::Vec};
+use anyhow::anyhow;
 use uefi::unsafe_guid;
 use uefi::CStr16;
 use uefi::{prelude::*, Guid, Identify};
@@ -55,11 +57,15 @@ pub struct HiiDatabase {
     ) -> Status,
 }
 
-pub fn ucs2_decode(s: &CStr16) -> String {
+fn err<T: Debug>(e: T) -> anyhow::Error {
+    anyhow!("{:?}", e)
+}
+
+pub fn ucs2_decode(s: &CStr16) -> anyhow::Result<String> {
     let mut buffer: Vec<u8> = vec![0; s.to_u16_slice().len() * 2];
-    let bytes = ucs2::decode(s.to_u16_slice(), &mut buffer).expect("UCS-2 decode failed");
+    let bytes = ucs2::decode(s.to_u16_slice(), &mut buffer).map_err(err)?;
     buffer.resize(bytes, 0);
-    String::from_utf8(buffer).expect("UTF-8 decode failed")
+    Ok(String::from_utf8(buffer).map_err(err)?)
 }
 
 #[repr(C)]
@@ -68,4 +74,23 @@ pub fn ucs2_decode(s: &CStr16) -> String {
 pub struct ShellParameters {
     pub argv: *const *const Char16,
     pub argc: usize,
+}
+
+pub fn parse_guid(s: &str) -> anyhow::Result<Guid> {
+    let parts: Vec<&str> = s.split("-").collect();
+    if parts.len() != 5 {
+        return Err(anyhow!("No enough guid parts"));
+    }
+    let a = u32::from_str_radix(parts[0], 16).map_err(err)?;
+    let b = u16::from_str_radix(parts[1], 16).map_err(err)?;
+    let c = u16::from_str_radix(parts[2], 16).map_err(err)?;
+    let d = u16::from_str_radix(parts[3], 16).map_err(err)?;
+    let e = u64::from_str_radix(parts[4], 16).map_err(err)?;
+    let e0 = (e >> 40) as u8;
+    let e1 = (e >> 32) as u8;
+    let e2 = (e >> 24) as u8;
+    let e3 = (e >> 16) as u8;
+    let e4 = (e >> 8) as u8;
+    let e5 = (e >> 0) as u8;
+    Ok(Guid::from_values(a, b, c, d, [e0, e1, e2, e3, e4, e5]))
 }

@@ -10,9 +10,7 @@ use efiutils::{ucs2_decode, FormBrowser2, HiiDatabase, ShellParameters};
 use log::*;
 use uefi::{prelude::*, CStr16, Char16, Guid};
 
-#[entry]
-fn efi_main(image: uefi::Handle, st: SystemTable<Boot>) -> Status {
-    uefi_services::init(&st).expect_success("UEFI services init failed");
+fn main(image: uefi::Handle, st: SystemTable<Boot>) -> anyhow::Result<()> {
     let bt = st.boot_services();
 
     let db = bt
@@ -55,8 +53,7 @@ fn efi_main(image: uefi::Handle, st: SystemTable<Boot>) -> Status {
     if params.argc > 1 {
         info!("Handles: {}", buffer.len());
         for s in &argv[1..] {
-            let arg = unsafe { CStr16::from_ptr(*s) };
-            let arg = ucs2_decode(arg);
+            let arg = ucs2_decode(unsafe { CStr16::from_ptr(*s) })?;
             info!("Arg: {}", arg);
             if let Ok(i) = str::parse::<usize>(&arg) {
                 let res = (browser.send_form)(
@@ -90,6 +87,18 @@ fn efi_main(image: uefi::Handle, st: SystemTable<Boot>) -> Status {
     info!("Argc {:?}", params.argc);
     info!("Argv {:?}", params.argv);
     info!("Res {:?}", v);
+    Ok(())
+}
 
-    Status::SUCCESS
+#[entry]
+fn efi_main(image: uefi::Handle, st: SystemTable<Boot>) -> Status {
+    uefi_services::init(&st).expect_success("UEFI services init failed");
+
+    match main(image, st) {
+        Ok(_) => Status::SUCCESS,
+        Err(err) => {
+            warn!("Error {}", err);
+            Status::ABORTED
+        }
+    }
 }

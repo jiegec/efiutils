@@ -1,5 +1,6 @@
 /target
-/esp
 /OVMF_VARS.fd
+/esp
 /esp.img
+/floppy
 /floppy.img
