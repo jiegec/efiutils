@@ -9,13 +9,14 @@ use alloc::vec;
 use anyhow::anyhow;
 use bitflags::bitflags;
 use core::fmt::Write;
-use efiutils::{err, parse_guid, ucs2_decode, ucs2_decode_ptr, ShellParameters};
+use efiutils::{err, parse_guid, proto::console::text::Key, ucs2_decode_ptr, ShellParameters};
 use log::*;
 use uefi::{data_types::chars::NUL_16, CStr16, Char16};
 use uefi::{prelude::*, Guid};
 
 fn main(image: uefi::Handle, st: SystemTable<Boot>) -> anyhow::Result<()> {
     let bt = st.boot_services();
+    let stdin = st.stdin();
     let stdout = st.stdout();
     let rt = st.runtime_services();
 
@@ -39,6 +40,7 @@ fn main(image: uefi::Handle, st: SystemTable<Boot>) -> anyhow::Result<()> {
         let width = str::parse::<usize>(&width_str).map_err(err)?;
         let value = str::parse::<u64>(&value_str).map_err(err)?;
         writeln!(stdout, "GUID={}", guid).unwrap();
+        writeln!(stdout, "NAME={}", name_str).unwrap();
 
         let mut data_size = 0;
         let mut attributes = 0u32;
@@ -47,7 +49,7 @@ fn main(image: uefi::Handle, st: SystemTable<Boot>) -> anyhow::Result<()> {
         if let Err(error) = res {
             if error.status() == Status::BUFFER_TOO_SMALL {
                 let mut data = vec![0u8; data_size];
-                let res = unsafe {
+                unsafe {
                     rt.get_variable(
                         argv[2],
                         &guid,
@@ -56,7 +58,8 @@ fn main(image: uefi::Handle, st: SystemTable<Boot>) -> anyhow::Result<()> {
                         data.as_mut_ptr(),
                     )
                 }
-                .map_err(err)?;
+                .map_err(err)?
+                .log();
 
                 write!(stdout, "ORIG=").unwrap();
                 for byte in &data {
@@ -74,6 +77,39 @@ fn main(image: uefi::Handle, st: SystemTable<Boot>) -> anyhow::Result<()> {
                     write!(stdout, "{:02X}", byte).unwrap();
                 }
                 writeln!(stdout).unwrap();
+
+                write!(stdout, "Apply (y/n)?").unwrap();
+                loop {
+                    if let Some(key) = stdin.read_key().map_err(err)?.log() {
+                        match key {
+                            Key::Printable(ch) => {
+                                let c = char::from(ch);
+                                writeln!(stdout, "{}", c).unwrap();
+                                if c == 'y' {
+                                    unsafe {
+                                        rt.set_variable(
+                                            argv[2],
+                                            &guid,
+                                            attributes,
+                                            data_size,
+                                            data.as_mut_ptr(),
+                                        )
+                                    }
+                                    .map_err(err)?
+                                    .log();
+                                    write!(stdout, "Done").unwrap();
+                                    break;
+                                } else if c == 'n' {
+                                    break;
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                    bt.wait_for_event(&mut [stdin.wait_for_key_event()])
+                        .map_err(err)?
+                        .log();
+                }
             } else {
                 return Err(anyhow!("GetVariable failed with {:?}", error));
             }
