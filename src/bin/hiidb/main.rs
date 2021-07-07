@@ -25,8 +25,8 @@ fn dump(db: &mut HiiDatabase, handle: usize) -> Vec<u8> {
 }
 
 #[entry]
-fn efi_main(_image: uefi::Handle, st: SystemTable<Boot>) -> Status {
-    uefi_services::init(&st).expect_success("UEFI services init failed");
+fn efi_main(_image: uefi::Handle, mut st: SystemTable<Boot>) -> Status {
+    uefi_services::init(&mut st).expect_success("UEFI services init failed");
     let bt = st.boot_services();
 
     let db = bt

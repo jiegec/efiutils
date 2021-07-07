@@ -4,9 +4,9 @@ version = 3
 
 [[package]]
 name = "anyhow"
-version = "1.0.40"
+version = "1.0.41"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28b2cd92db5cbd74e8e5028f7e27dd7aa3090e89e4f2a197cc7c8dfb69c7063b"
+checksum = "15af2628f6890fe2609a3b91bef4c83450512802e59489f9c1cb1fa5df064a61"
 
 [[package]]
 name = "bit_field"
@@ -49,18 +49,12 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.26"
+version = "1.0.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a152013215dca273577e18d2bf00fa862b89b24169fb78c4c95aeb07992c9cec"
+checksum = "f0d8caf72986c1a598726adc988bb5984792ef84f5ee5aa50209145ee8077038"
 dependencies = [
  "unicode-xid",
 ]
-
-[[package]]
-name = "qemu-exit"
-version = "1.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "702abe3c3255be20a4d67bda326c4117081a49a57afaf752de4845091bc6b476"
 
 [[package]]
 name = "quote"
@@ -73,9 +67,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "1.0.71"
+version = "1.0.73"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad184cc9470f9117b2ac6817bfe297307418819ba40552f9b3846f05c33d5373"
+checksum = "f71489ff30030d2ae598524f61326b902466f72a0fb1a8564c001cc63425bcc7"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -93,7 +87,7 @@ dependencies = [
 
 [[package]]
 name = "uefi"
-version = "0.8.0"
+version = "0.11.0"
 dependencies = [
  "bitflags",
  "log",
@@ -112,11 +106,10 @@ dependencies = [
 
 [[package]]
 name = "uefi-services"
-version = "0.5.0"
+version = "0.8.0"
 dependencies = [
  "cfg-if",
  "log",
- "qemu-exit",
  "uefi",
 ]
 

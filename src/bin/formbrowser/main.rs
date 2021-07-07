@@ -91,8 +91,8 @@ fn main(image: uefi::Handle, st: SystemTable<Boot>) -> anyhow::Result<()> {
 }
 
 #[entry]
-fn efi_main(image: uefi::Handle, st: SystemTable<Boot>) -> Status {
-    uefi_services::init(&st).expect_success("UEFI services init failed");
+fn efi_main(image: uefi::Handle, mut st: SystemTable<Boot>) -> Status {
+    uefi_services::init(&mut st).expect_success("UEFI services init failed");
 
     match main(image, st) {
         Ok(_) => Status::SUCCESS,
