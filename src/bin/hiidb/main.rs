@@ -7,11 +7,7 @@ use alloc::collections::BTreeSet;
 use alloc::vec;
 use alloc::vec::Vec;
 use efiutils::HiiDatabase;
-use uefi::{
-    prelude::*,
-    table::boot::{OpenProtocolParams, SearchType},
-    Guid,
-};
+use uefi::{prelude::*, table::boot::SearchType, Guid};
 use uefi_services::{print, println};
 
 #[entry]

@@ -10,7 +10,7 @@ use log::*;
 use uefi::table::boot::SearchType;
 use uefi::{prelude::*, CStr16, Char16, Guid};
 
-fn main(image: uefi::Handle, st: SystemTable<Boot>) -> anyhow::Result<()> {
+fn main(_image: uefi::Handle, st: SystemTable<Boot>) -> anyhow::Result<()> {
     let bt = st.boot_services();
 
     let handle = bt
