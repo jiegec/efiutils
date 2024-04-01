@@ -2,8 +2,8 @@
 #![no_main]
 
 use uefi::proto::unsafe_protocol;
+use uefi::CStr16;
 use uefi::{prelude::*, Char16};
-use uefi::{CStr16};
 
 pub use uefi::proto;
 use uefi_services::println;

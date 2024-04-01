@@ -8,8 +8,8 @@ use alloc::{vec, vec::Vec};
 use anyhow::anyhow;
 use uefi::proto::unsafe_protocol;
 use uefi::CStr16;
+use uefi::Char16;
 use uefi::{prelude::*, Guid};
-use uefi::{Char16};
 
 pub use uefi::proto;
 

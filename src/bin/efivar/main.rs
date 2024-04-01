@@ -7,8 +7,8 @@ use alloc::vec;
 use anyhow::bail;
 use efiutils::{err, ucs2_decode_ptr, ShellParameters};
 use log::*;
-use uefi::{CStr16, Char16};
 use uefi::{prelude::*, Guid};
+use uefi::{CStr16, Char16};
 use uefi_services::{print, println};
 
 fn main(image: uefi::Handle, st: SystemTable<Boot>) -> anyhow::Result<()> {
@@ -80,7 +80,6 @@ fn main(image: uefi::Handle, st: SystemTable<Boot>) -> anyhow::Result<()> {
         print!("Done");
     } else if params.argc == 1 {
         // list
-        const NAME_SIZE: usize = 1024;
         let mut data = vec![0u8; 1024];
 
         for key in rt.variable_keys().expect("Failed to list variables") {
