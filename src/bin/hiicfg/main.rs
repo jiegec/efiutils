@@ -1,16 +1,15 @@
 #![no_std]
 #![no_main]
-#![feature(abi_efiapi, negative_impls)]
 
-use uefi::unsafe_guid;
-use uefi::{prelude::*, Char16, Guid, Identify};
-use uefi::{proto::Protocol, CStr16};
+use uefi::proto::unsafe_protocol;
+use uefi::{prelude::*, Char16};
+use uefi::{CStr16};
 
 pub use uefi::proto;
+use uefi_services::println;
 
 #[repr(C)]
-#[unsafe_guid("587e72d7-cc50-4f79-8209-ca291fc1a10f")]
-#[derive(Protocol)]
+#[unsafe_protocol("587e72d7-cc50-4f79-8209-ca291fc1a10f")]
 pub struct HiiConfigRouting {
     extract_config: extern "efiapi" fn(
         &HiiConfigRouting,
@@ -27,19 +26,18 @@ pub struct HiiConfigRouting {
 }
 
 #[entry]
-fn efi_main(_image: uefi::Handle, mut st: SystemTable<Boot>) -> Status {
-    uefi_services::init(&mut st).expect_success("UEFI services init failed");
+fn efi_main(image: uefi::Handle, mut st: SystemTable<Boot>) -> Status {
+    uefi_services::init(&mut st).expect("UEFI services init failed");
     let bt = st.boot_services();
 
     let routing = bt
-        .locate_protocol::<HiiConfigRouting>()
-        .expect_success("Locate hii config routing protocol failed");
-    let routing = unsafe { &mut *routing.get() };
+        .open_protocol_exclusive::<HiiConfigRouting>(image)
+        .expect("Locate hii config routing protocol failed");
 
     let mut results: *const Char16 = 0 as *const Char16;
     let _res = (routing.export_config)(&routing, &mut results);
     let s = unsafe { CStr16::from_ptr(results) };
-    st.stdout().output_string(s).unwrap().unwrap();
+    println!("{}", s);
 
     Status::SUCCESS
 }

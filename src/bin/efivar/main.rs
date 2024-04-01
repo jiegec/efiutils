@@ -1,25 +1,23 @@
 #![no_std]
 #![no_main]
-#![feature(abi_efiapi, negative_impls)]
 
 extern crate alloc;
 
 use alloc::vec;
-use core::fmt::Write;
-use efiutils::{err, parse_guid, proto::console::text::Key, ucs2_decode_ptr, ShellParameters};
+use anyhow::bail;
+use efiutils::{err, ucs2_decode_ptr, ShellParameters};
 use log::*;
-use uefi::{data_types::chars::NUL_16, CStr16, Char16};
-use uefi::{prelude::*, Guid, ResultExt};
+use uefi::{CStr16, Char16};
+use uefi::{prelude::*, Guid};
+use uefi_services::{print, println};
 
 fn main(image: uefi::Handle, st: SystemTable<Boot>) -> anyhow::Result<()> {
     let bt = st.boot_services();
-    let stdout = st.stdout();
     let rt = st.runtime_services();
 
     let params = bt
-        .handle_protocol::<ShellParameters>(image)
-        .expect_success("Locate shell parameter protocol failed");
-    let params = unsafe { &mut *params.get() };
+        .open_protocol_exclusive::<ShellParameters>(image)
+        .expect("Locate shell parameter protocol failed");
 
     let argv: &[*const Char16] = unsafe { core::slice::from_raw_parts(params.argv, params.argc) };
     if params.argc == 6 {
@@ -31,101 +29,81 @@ fn main(image: uefi::Handle, st: SystemTable<Boot>) -> anyhow::Result<()> {
         let width_str = unsafe { ucs2_decode_ptr(argv[4]) }?;
         let value_str = unsafe { ucs2_decode_ptr(argv[5]) }?;
 
-        let guid = parse_guid(&guid_str)?;
+        let guid = match Guid::try_parse(&guid_str) {
+            Ok(guid) => guid,
+            Err(err) => bail!("Failed to parse guid: {}", err),
+        };
         let offset = str::parse::<usize>(&offset_str).map_err(err)?;
         let width = str::parse::<usize>(&width_str).map_err(err)?;
         let value = str::parse::<u64>(&value_str).map_err(err)?;
-        writeln!(stdout, "GUID={}", guid).unwrap();
-        writeln!(stdout, "NAME={}", name_str).unwrap();
+        println!("GUID={}", guid);
+        println!("NAME={}", name_str);
 
         let name_cstr = unsafe { CStr16::from_ptr(argv[2]) };
         let data_size = rt
-            .get_variable_size(&name_cstr, &guid)
-            .expect_success("Failed to get variable");
+            .get_variable_size(&name_cstr, &uefi::table::runtime::VariableVendor(guid))
+            .expect("Failed to get variable");
         let mut data = vec![0u8; data_size];
         let (_, attributes) = rt
-            .get_variable(name_cstr, &guid, data.as_mut_slice())
-            .expect_success("Failed to get variable");
+            .get_variable(
+                name_cstr,
+                &uefi::table::runtime::VariableVendor(guid),
+                data.as_mut_slice(),
+            )
+            .expect("Failed to get variable");
 
-        write!(stdout, "ORIG=").unwrap();
+        print!("ORIG=");
         for byte in &data {
-            write!(stdout, "{:02X}", byte).unwrap();
+            print!("{:02X}", byte);
         }
-        writeln!(stdout).unwrap();
+        println!();
 
         let bytes = value.to_le_bytes();
         for i in 0..width {
             data[offset + i] = bytes[width - i - 1];
         }
 
-        write!(stdout, "NEW =").unwrap();
+        print!("NEW =");
         for byte in &data {
-            write!(stdout, "{:02X}", byte).unwrap();
+            print!("{:02X}", byte);
         }
-        writeln!(stdout).unwrap();
+        println!();
 
-        write!(stdout, "Apply (y/n)?").unwrap();
-        loop {
-            let stdin = st.stdin();
-            if let Some(key) = stdin.read_key().map_err(err)?.log() {
-                match key {
-                    Key::Printable(ch) => {
-                        let c = char::from(ch);
-                        writeln!(stdout, "{}", c).unwrap();
-                        if c == 'y' {
-                            rt.set_variable(&name_cstr, &guid, attributes, &data)
-                                .expect_success("Failed to set variable");
-                            write!(stdout, "Done").unwrap();
-                            break;
-                        } else if c == 'n' {
-                            break;
-                        }
-                    }
-                    _ => {}
-                }
-            }
-            bt.wait_for_event(&mut [stdin.wait_for_key_event()])
-                .map_err(err)?
-                .log();
-        }
+        rt.set_variable(
+            &name_cstr,
+            &uefi::table::runtime::VariableVendor(guid),
+            attributes,
+            &data,
+        )
+        .expect("Failed to set variable");
+
+        print!("Done");
     } else if params.argc == 1 {
         // list
         const NAME_SIZE: usize = 1024;
-        let mut name = [NUL_16; NAME_SIZE];
-        let mut guid = Guid::from_values(0, 0, 0, 0, [0u8; 6]);
         let mut data = vec![0u8; 1024];
 
-        loop {
-            let mut name_size = NAME_SIZE;
-            let res =
-                unsafe { rt.get_next_variable_name(&mut name_size, name.as_mut_ptr(), &mut guid) };
-            if let Err(error) = res {
-                if error.status() != Status::NOT_FOUND {
-                    writeln!(stdout, "GetNextVariable name failed with {:?}", error).unwrap();
-                }
-                break;
-            }
-
-            writeln!(stdout, "GUID={}", guid).unwrap();
-            let name_slice = unsafe { CStr16::from_ptr(name.as_ptr()) };
-            writeln!(stdout, "NAME={}", efiutils::ucs2_decode(name_slice)?).unwrap();
+        for key in rt.variable_keys().expect("Failed to list variables") {
+            println!("GUID={}", key.vendor.0);
+            let name = key.name().unwrap();
+            println!("NAME={}", efiutils::ucs2_decode(&name)?);
 
             let data_size = rt
-                .get_variable_size(name_slice, &guid)
-                .expect_success("Failed to get variable size");
+                .get_variable_size(name, &key.vendor)
+                .expect("Failed to get variable size");
             data.resize(data_size, 0);
             let (_, attributes) = rt
-                .get_variable(name_slice, &guid, data.as_mut_slice())
-                .expect_success("Failed to get variable");
+                .get_variable(name, &key.vendor, data.as_mut_slice())
+                .expect("Failed to get variable");
 
-            writeln!(stdout, "ATTR={:?}", attributes,).unwrap();
+            println!("ATTR={:?}", attributes);
 
             let data_slice = &data[..data_size];
-            write!(stdout, "DATA=").unwrap();
+            print!("DATA=");
             for byte in data_slice {
-                write!(stdout, "{:02X}", byte).unwrap();
+                print!("{:02X}", byte);
             }
-            writeln!(stdout).unwrap();
+            println!();
         }
     } else {
         info!("Usage:");
@@ -138,7 +116,7 @@ fn main(image: uefi::Handle, st: SystemTable<Boot>) -> anyhow::Result<()> {
 
 #[entry]
 fn efi_main(image: uefi::Handle, mut st: SystemTable<Boot>) -> Status {
-    uefi_services::init(&mut st).expect_success("UEFI services init failed");
+    uefi_services::init(&mut st).expect("UEFI services init failed");
 
     match main(image, st) {
         Ok(_) => Status::SUCCESS,

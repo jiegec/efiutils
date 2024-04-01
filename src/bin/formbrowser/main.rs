@@ -1,6 +1,5 @@
 #![no_std]
 #![no_main]
-#![feature(abi_efiapi, negative_impls)]
 
 extern crate alloc;
 
@@ -14,9 +13,8 @@ fn main(image: uefi::Handle, st: SystemTable<Boot>) -> anyhow::Result<()> {
     let bt = st.boot_services();
 
     let db = bt
-        .locate_protocol::<HiiDatabase>()
-        .expect_success("Locate hii database protocol failed");
-    let db = unsafe { &mut *db.get() };
+        .open_protocol_exclusive::<HiiDatabase>(image)
+        .expect("Locate hii database protocol failed");
 
     let mut buffer_size = 0;
     // EFI_HII_PACKAGE_TYPE_ALL
@@ -39,14 +37,12 @@ fn main(image: uefi::Handle, st: SystemTable<Boot>) -> anyhow::Result<()> {
     let buffer: Vec<usize> = buffer_set.into_iter().collect();
 
     let browser = bt
-        .locate_protocol::<FormBrowser2>()
-        .expect_success("Locate form browser2 protocol failed");
-    let browser = unsafe { &mut *browser.get() };
+        .open_protocol_exclusive::<FormBrowser2>(image)
+        .expect("Locate form browser2 protocol failed");
 
     let params = bt
-        .handle_protocol::<ShellParameters>(image)
-        .expect_success("Locate shell parameter protocol failed");
-    let params = unsafe { &mut *params.get() };
+        .open_protocol_exclusive::<ShellParameters>(image)
+        .expect("Locate shell parameter protocol failed");
 
     let mut v = vec![];
     let argv: &[*const Char16] = unsafe { core::slice::from_raw_parts(params.argv, params.argc) };
@@ -92,7 +88,7 @@ fn main(image: uefi::Handle, st: SystemTable<Boot>) -> anyhow::Result<()> {
 
 #[entry]
 fn efi_main(image: uefi::Handle, mut st: SystemTable<Boot>) -> Status {
-    uefi_services::init(&mut st).expect_success("UEFI services init failed");
+    uefi_services::init(&mut st).expect("UEFI services init failed");
 
     match main(image, st) {
         Ok(_) => Status::SUCCESS,

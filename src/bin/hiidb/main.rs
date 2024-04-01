@@ -1,38 +1,23 @@
 #![no_std]
 #![no_main]
-#![feature(abi_efiapi, negative_impls)]
 
 extern crate alloc;
 
 use alloc::collections::BTreeSet;
 use alloc::vec;
 use alloc::vec::Vec;
-use core::fmt::Write;
 use efiutils::HiiDatabase;
 use uefi::{prelude::*, Guid};
-
-fn dump(db: &mut HiiDatabase, handle: usize) -> Vec<u8> {
-    let mut buffer_size = 0;
-    // EFI_HII_PACKAGE_TYPE_ALL
-    let res = (db.export_package_lists)(&db, handle, &mut buffer_size, 0 as *mut u8);
-    assert!(res == Status::BUFFER_TOO_SMALL);
-
-    let mut buffer: Vec<u8> = vec![0u8; buffer_size];
-    let res = (db.export_package_lists)(&db, handle, &mut buffer_size, buffer.as_mut_ptr());
-    assert!(res == Status::SUCCESS);
-
-    buffer
-}
+use uefi_services::{print, println};
 
 #[entry]
-fn efi_main(_image: uefi::Handle, mut st: SystemTable<Boot>) -> Status {
-    uefi_services::init(&mut st).expect_success("UEFI services init failed");
+fn efi_main(image: uefi::Handle, mut st: SystemTable<Boot>) -> Status {
+    uefi_services::init(&mut st).expect("UEFI services init failed");
     let bt = st.boot_services();
 
     let db = bt
-        .locate_protocol::<HiiDatabase>()
-        .expect_success("Locate hii database protocol failed");
-    let db = unsafe { &mut *db.get() };
+        .open_protocol_exclusive::<HiiDatabase>(image)
+        .expect("Locate hii database protocol failed");
 
     let mut buffer_size = 0;
     // EFI_HII_PACKAGE_TYPE_ALL
@@ -53,14 +38,20 @@ fn efi_main(_image: uefi::Handle, mut st: SystemTable<Boot>) -> Status {
     let mut buffer_set = BTreeSet::new();
     buffer_set.extend(buffer);
 
-    let stdout = st.stdout();
     for handle in buffer_set {
-        let v = dump(db, handle);
+        let mut buffer_size = 0;
+        // EFI_HII_PACKAGE_TYPE_ALL
+        let res = (db.export_package_lists)(&db, handle, &mut buffer_size, 0 as *mut u8);
+        assert!(res == Status::BUFFER_TOO_SMALL);
+
+        let mut v: Vec<u8> = vec![0u8; buffer_size];
+        let res = (db.export_package_lists)(&db, handle, &mut buffer_size, v.as_mut_ptr());
+        assert!(res == Status::SUCCESS);
 
         for byte in v {
-            write!(stdout, "{:02X}", byte).unwrap();
+            print!("{:02X}", byte);
         }
-        writeln!(stdout).unwrap();
+        println!();
     }
 
     Status::SUCCESS
