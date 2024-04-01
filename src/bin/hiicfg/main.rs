@@ -1,6 +1,8 @@
 #![no_std]
 #![no_main]
 
+use efiutils::WithContext;
+use log::warn;
 use uefi::proto::unsafe_protocol;
 use uefi::table::boot::SearchType;
 use uefi::CStr16;
@@ -26,23 +28,33 @@ pub struct HiiConfigRouting {
     ) -> Status,
 }
 
-#[entry]
-fn efi_main(image: uefi::Handle, mut st: SystemTable<Boot>) -> Status {
-    uefi_services::init(&mut st).expect("UEFI services init failed");
+fn main(_image: uefi::Handle, st: SystemTable<Boot>) -> efiutils::Result<()> {
     let bt = st.boot_services();
 
     let handle = bt
         .locate_handle_buffer(SearchType::from_proto::<HiiConfigRouting>())
-        .expect("Failed to find protocol handle")[0];
+        .with_context("Failed to find protocol handle")?[0];
 
     let routing = bt
         .open_protocol_exclusive::<HiiConfigRouting>(handle)
-        .expect("Locate hii config routing protocol failed");
+        .with_context("Locate hii config routing protocol failed")?;
 
     let mut results: *const Char16 = 0 as *const Char16;
     let _res = (routing.export_config)(&routing, &mut results);
     let s = unsafe { CStr16::from_ptr(results) };
     println!("{}", s);
+    Ok(())
+}
 
-    Status::SUCCESS
+#[entry]
+fn efi_main(image: uefi::Handle, mut st: SystemTable<Boot>) -> Status {
+    uefi_services::init(&mut st).expect("UEFI services init failed");
+
+    match main(image, st) {
+        Ok(_) => Status::SUCCESS,
+        Err(err) => {
+            warn!("Error {}", err);
+            Status::ABORTED
+        }
+    }
 }

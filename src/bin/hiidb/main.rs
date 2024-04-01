@@ -6,22 +6,21 @@ extern crate alloc;
 use alloc::collections::BTreeSet;
 use alloc::vec;
 use alloc::vec::Vec;
-use efiutils::HiiDatabase;
+use efiutils::{HiiDatabase, WithContext};
+use log::warn;
 use uefi::{prelude::*, table::boot::SearchType, Guid};
 use uefi_services::{print, println};
 
-#[entry]
-fn efi_main(image: uefi::Handle, mut st: SystemTable<Boot>) -> Status {
-    uefi_services::init(&mut st).expect("UEFI services init failed");
+fn main(_image: uefi::Handle, st: SystemTable<Boot>) -> efiutils::Result<()> {
     let bt = st.boot_services();
 
     let handle = bt
         .locate_handle_buffer(SearchType::from_proto::<HiiDatabase>())
-        .expect("Failed to find protocol handle")[0];
+        .with_context("Failed to find protocol handle")?[0];
 
     let db = bt
         .open_protocol_exclusive::<HiiDatabase>(handle)
-        .expect("Locate hii database protocol failed");
+        .with_context("Locate hii database protocol failed")?;
 
     let mut buffer_size = 0;
     // EFI_HII_PACKAGE_TYPE_ALL
@@ -57,6 +56,18 @@ fn efi_main(image: uefi::Handle, mut st: SystemTable<Boot>) -> Status {
         }
         println!();
     }
+    Ok(())
+}
 
-    Status::SUCCESS
+#[entry]
+fn efi_main(image: uefi::Handle, mut st: SystemTable<Boot>) -> Status {
+    uefi_services::init(&mut st).expect("UEFI services init failed");
+
+    match main(image, st) {
+        Ok(_) => Status::SUCCESS,
+        Err(err) => {
+            warn!("Error {}", err);
+            Status::ABORTED
+        }
+    }
 }

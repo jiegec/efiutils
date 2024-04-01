@@ -5,21 +5,21 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 use alloc::{collections::BTreeSet, vec};
-use efiutils::{ucs2_decode, FormBrowser2, HiiDatabase, ShellParameters};
+use efiutils::{ucs2_decode, FormBrowser2, HiiDatabase, ShellParameters, WithContext};
 use log::*;
 use uefi::table::boot::SearchType;
 use uefi::{prelude::*, CStr16, Char16, Guid};
 
-fn main(_image: uefi::Handle, st: SystemTable<Boot>) -> anyhow::Result<()> {
+fn main(_image: uefi::Handle, st: SystemTable<Boot>) -> efiutils::Result<()> {
     let bt = st.boot_services();
 
     let handle = bt
         .locate_handle_buffer(SearchType::from_proto::<HiiDatabase>())
-        .expect("Failed to find protocol handle")[0];
+        .with_context("Failed to find protocol handle")?[0];
 
     let db = bt
         .open_protocol_exclusive::<HiiDatabase>(handle)
-        .expect("Locate hii database protocol failed");
+        .with_context("Locate hii database protocol failed")?;
 
     let mut buffer_size = 0;
     // EFI_HII_PACKAGE_TYPE_ALL
@@ -43,19 +43,19 @@ fn main(_image: uefi::Handle, st: SystemTable<Boot>) -> anyhow::Result<()> {
 
     let handle = bt
         .locate_handle_buffer(SearchType::from_proto::<FormBrowser2>())
-        .expect("Failed to find protocol handle")[0];
+        .with_context("Failed to find protocol handle")?[0];
 
     let browser = bt
         .open_protocol_exclusive::<FormBrowser2>(handle)
-        .expect("Locate form browser2 protocol failed");
+        .with_context("Locate form browser2 protocol failed")?;
 
     let handle = bt
         .locate_handle_buffer(SearchType::from_proto::<ShellParameters>())
-        .expect("Failed to find protocol handle")[0];
+        .with_context("Failed to find protocol handle")?[0];
 
     let params = bt
         .open_protocol_exclusive::<ShellParameters>(handle)
-        .expect("Locate shell parameter protocol failed");
+        .with_context("Locate shell parameter protocol failed")?;
 
     let mut v = vec![];
     let argv: &[*const Char16] = unsafe { core::slice::from_raw_parts(params.argv, params.argc) };
