@@ -7,7 +7,11 @@ use alloc::collections::BTreeSet;
 use alloc::vec;
 use alloc::vec::Vec;
 use efiutils::HiiDatabase;
-use uefi::{prelude::*, Guid};
+use uefi::{
+    prelude::*,
+    table::boot::{OpenProtocolParams, SearchType},
+    Guid,
+};
 use uefi_services::{print, println};
 
 #[entry]
@@ -15,8 +19,12 @@ fn efi_main(image: uefi::Handle, mut st: SystemTable<Boot>) -> Status {
     uefi_services::init(&mut st).expect("UEFI services init failed");
     let bt = st.boot_services();
 
+    let handle = bt
+        .locate_handle_buffer(SearchType::from_proto::<HiiDatabase>())
+        .expect("Failed to find protocol handle")[0];
+
     let db = bt
-        .open_protocol_exclusive::<HiiDatabase>(image)
+        .open_protocol_exclusive::<HiiDatabase>(handle)
         .expect("Locate hii database protocol failed");
 
     let mut buffer_size = 0;

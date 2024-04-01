@@ -2,6 +2,7 @@
 #![no_main]
 
 use uefi::proto::unsafe_protocol;
+use uefi::table::boot::SearchType;
 use uefi::CStr16;
 use uefi::{prelude::*, Char16};
 
@@ -30,8 +31,12 @@ fn efi_main(image: uefi::Handle, mut st: SystemTable<Boot>) -> Status {
     uefi_services::init(&mut st).expect("UEFI services init failed");
     let bt = st.boot_services();
 
+    let handle = bt
+        .locate_handle_buffer(SearchType::from_proto::<HiiConfigRouting>())
+        .expect("Failed to find protocol handle")[0];
+
     let routing = bt
-        .open_protocol_exclusive::<HiiConfigRouting>(image)
+        .open_protocol_exclusive::<HiiConfigRouting>(handle)
         .expect("Locate hii config routing protocol failed");
 
     let mut results: *const Char16 = 0 as *const Char16;

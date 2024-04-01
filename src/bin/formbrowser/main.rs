@@ -7,13 +7,18 @@ use alloc::vec::Vec;
 use alloc::{collections::BTreeSet, vec};
 use efiutils::{ucs2_decode, FormBrowser2, HiiDatabase, ShellParameters};
 use log::*;
+use uefi::table::boot::SearchType;
 use uefi::{prelude::*, CStr16, Char16, Guid};
 
 fn main(image: uefi::Handle, st: SystemTable<Boot>) -> anyhow::Result<()> {
     let bt = st.boot_services();
 
+    let handle = bt
+        .locate_handle_buffer(SearchType::from_proto::<HiiDatabase>())
+        .expect("Failed to find protocol handle")[0];
+
     let db = bt
-        .open_protocol_exclusive::<HiiDatabase>(image)
+        .open_protocol_exclusive::<HiiDatabase>(handle)
         .expect("Locate hii database protocol failed");
 
     let mut buffer_size = 0;
@@ -36,12 +41,20 @@ fn main(image: uefi::Handle, st: SystemTable<Boot>) -> anyhow::Result<()> {
     buffer_set.extend(buffer);
     let buffer: Vec<usize> = buffer_set.into_iter().collect();
 
+    let handle = bt
+        .locate_handle_buffer(SearchType::from_proto::<FormBrowser2>())
+        .expect("Failed to find protocol handle")[0];
+
     let browser = bt
-        .open_protocol_exclusive::<FormBrowser2>(image)
+        .open_protocol_exclusive::<FormBrowser2>(handle)
         .expect("Locate form browser2 protocol failed");
 
+    let handle = bt
+        .locate_handle_buffer(SearchType::from_proto::<ShellParameters>())
+        .expect("Failed to find protocol handle")[0];
+
     let params = bt
-        .open_protocol_exclusive::<ShellParameters>(image)
+        .open_protocol_exclusive::<ShellParameters>(handle)
         .expect("Locate shell parameter protocol failed");
 
     let mut v = vec![];
@@ -67,6 +80,7 @@ fn main(image: uefi::Handle, st: SystemTable<Boot>) -> anyhow::Result<()> {
     } else {
         // try handles one by one
         for i in 0..buffer.len() {
+            info!("Opening form with handle: {}", buffer[i]);
             let res = (browser.send_form)(
                 &browser,
                 &buffer[i],
