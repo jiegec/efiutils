@@ -16,7 +16,16 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: Setup
+      run: rustup target add x86_64-unknown-uefi
     - name: Build
       run: cargo build --verbose
     - name: Run tests
       run: cargo test --verbose
+    - name: Build release
+      run: cargo build --release --verbose
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: binaries
+        path: build/x86_64-unknown-uefi/release/*.efi
